@@ -29,9 +29,10 @@ def main():
     st.markdown("*Baker's percentages, scaling, and unit conversions made easy*")
 
     # Create tabs for different functions
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📝 Recipe Builder",
         "📊 Baker's Percentages",
+        "🔬 Recipe Analysis",
         "⚖️ Scale Recipe",
         "📋 Recipe Converter",
         "🔄 Unit Converter",
@@ -45,15 +46,18 @@ def main():
         bakers_percentage_tab()
 
     with tab3:
-        scale_recipe_tab()
+        recipe_analysis_tab()
 
     with tab4:
-        recipe_converter_tab()
+        scale_recipe_tab()
 
     with tab5:
-        unit_converter_tab()
+        recipe_converter_tab()
 
     with tab6:
+        unit_converter_tab()
+
+    with tab7:
         custom_conversions_tab()
 
 
@@ -197,6 +201,223 @@ def bakers_percentage_tab():
 
     except Exception as e:
         st.error(f"Error calculating percentages: {e}")
+
+
+def recipe_analysis_tab():
+    """Tab for analyzing recipe and providing expert insights."""
+    st.header("Recipe Analysis")
+    st.markdown("*Get expert insights and warnings about your recipe's formulation*")
+
+    if not st.session_state.current_recipe.ingredients:
+        st.warning("Please add ingredients to your recipe first (Recipe Builder tab)")
+        return
+
+    # Calculate percentages first
+    try:
+        recipe = st.session_state.calculator.calculate_percentages(
+            st.session_state.current_recipe
+        )
+    except Exception as e:
+        st.error(f"Error: {e}")
+        return
+
+    st.subheader(f"🔬 {recipe.name}")
+
+    # Collect ingredient percentages by type
+    ingredients_by_type = {
+        'salt': 0.0,
+        'yeast': 0.0,
+        'sugar': 0.0,
+        'fat': 0.0,
+        'liquid': 0.0,
+        'whole_grain': 0.0,
+        'white_flour': 0.0,
+    }
+
+    for ingredient in recipe.ingredients.values():
+        name_lower = ingredient.name.lower()
+
+        # Salt
+        if 'salt' in name_lower:
+            ingredients_by_type['salt'] += ingredient.percentage
+
+        # Yeast
+        if 'yeast' in name_lower:
+            ingredients_by_type['yeast'] += ingredient.percentage
+
+        # Sugar
+        if any(s in name_lower for s in ['sugar', 'honey', 'maple syrup', 'molasses']):
+            ingredients_by_type['sugar'] += ingredient.percentage
+
+        # Fat
+        if any(f in name_lower for f in ['butter', 'oil', 'shortening', 'lard']):
+            ingredients_by_type['fat'] += ingredient.percentage
+
+        # Liquid
+        if any(l in name_lower for l in ['water', 'milk', 'cream', 'buttermilk', 'yogurt']):
+            ingredients_by_type['liquid'] += ingredient.percentage
+
+        # Eggs count as both liquid and fat
+        if 'egg' in name_lower:
+            ingredients_by_type['liquid'] += ingredient.percentage * 0.75  # 75% liquid
+            ingredients_by_type['fat'] += ingredient.percentage * 0.11     # 11% fat
+
+        # Whole grain vs white flour
+        if 'flour' in name_lower:
+            if any(wg in name_lower for wg in ['whole wheat', 'whole grain', 'rye', 'spelt']):
+                ingredients_by_type['whole_grain'] += ingredient.percentage
+            else:
+                ingredients_by_type['white_flour'] += ingredient.percentage
+
+    # Calculate hydration
+    hydration = ingredients_by_type['liquid']
+
+    # Analysis sections
+    insights = []
+    warnings = []
+    tips = []
+
+    # === SALT ANALYSIS ===
+    st.subheader("🧂 Salt")
+    salt_pct = ingredients_by_type['salt']
+    if salt_pct > 0:
+        st.metric("Salt Percentage", f"{salt_pct:.1f}%")
+        if salt_pct < 1.5:
+            warnings.append("⚠️ **Salt is low** - Typical bread uses 1.8-2.2% salt. Your bread may taste bland.")
+        elif salt_pct > 2.5:
+            warnings.append("🔴 **Salt is too high!** - Over 2.5% will make the bread very salty and can inhibit yeast.")
+        elif 1.8 <= salt_pct <= 2.2:
+            insights.append("✅ **Salt is perfect** - Right in the typical range (1.8-2.2%)")
+        else:
+            insights.append(f"ℹ️ **Salt is {salt_pct:.1f}%** - Within acceptable range, though typical is 1.8-2.2%")
+    else:
+        warnings.append("❗ **No salt detected** - Bread without salt will taste flat and ferment too quickly")
+
+    # === HYDRATION ANALYSIS ===
+    st.subheader("💧 Hydration")
+    st.metric("Hydration", f"{hydration:.1f}%")
+    if hydration > 0:
+        if hydration < 50:
+            warnings.append("⚠️ **Very low hydration** - This is extremely dry. Typical breads are 55-80%.")
+            tips.append("💡 Consider adding more liquid for a softer crumb")
+        elif hydration < 58:
+            insights.append(f"ℹ️ **Low hydration ({hydration:.1f}%)** - Good for bagels, pretzels, or very dense breads")
+        elif 58 <= hydration <= 65:
+            insights.append(f"✅ **Medium hydration ({hydration:.1f}%)** - Perfect for sandwich bread and dinner rolls")
+        elif 66 <= hydration <= 75:
+            insights.append(f"✅ **High hydration ({hydration:.1f}%)** - Great for artisan breads, rustic loaves")
+        elif 76 <= hydration <= 85:
+            insights.append(f"ℹ️ **Very high hydration ({hydration:.1f}%)** - Challenging to handle but creates open crumb (ciabatta, focaccia)")
+            tips.append("💡 Use stretch-and-fold technique instead of kneading")
+        else:
+            warnings.append(f"⚠️ **Extremely high hydration ({hydration:.1f}%)** - This will be very difficult to work with")
+            tips.append("💡 Consider reducing liquid or using a no-knead method")
+
+    # === YEAST ANALYSIS ===
+    st.subheader("🦠 Yeast")
+    yeast_pct = ingredients_by_type['yeast']
+    if yeast_pct > 0:
+        st.metric("Yeast Percentage", f"{yeast_pct:.1f}%")
+        if yeast_pct < 0.5:
+            insights.append(f"ℹ️ **Low yeast ({yeast_pct:.1f}%)** - Long, slow fermentation. Great for flavor development")
+            tips.append("💡 This will need a longer rise time (4-12+ hours)")
+        elif 0.5 <= yeast_pct <= 2:
+            insights.append(f"✅ **Normal yeast ({yeast_pct:.1f}%)** - Standard rise time (1-2 hours)")
+        elif 2 < yeast_pct <= 3:
+            warnings.append(f"⚠️ **High yeast ({yeast_pct:.1f}%)** - Will rise quickly but may taste overly yeasty")
+        else:
+            warnings.append(f"🔴 **Too much yeast! ({yeast_pct:.1f}%)** - Bread will taste strongly of yeast and may over-proof quickly")
+            tips.append("💡 Reduce yeast to 1-2% for better flavor")
+
+    # === SUGAR ANALYSIS ===
+    st.subheader("🍯 Sugar")
+    sugar_pct = ingredients_by_type['sugar']
+    if sugar_pct > 0:
+        st.metric("Sugar Percentage", f"{sugar_pct:.1f}%")
+        if sugar_pct < 5:
+            insights.append(f"ℹ️ **Low sugar ({sugar_pct:.1f}%)** - Lean dough, minimal sweetness")
+        elif 5 <= sugar_pct <= 10:
+            insights.append(f"✅ **Light sweetness ({sugar_pct:.1f}%)** - Slightly enriched, helps browning")
+        elif 10 < sugar_pct <= 20:
+            insights.append(f"ℹ️ **Sweet dough ({sugar_pct:.1f}%)** - Good for breakfast breads, brioche-style")
+        else:
+            warnings.append(f"⚠️ **Very sweet ({sugar_pct:.1f}%)** - High sugar can slow yeast activity")
+            tips.append("💡 May need longer rise time or more yeast")
+    else:
+        insights.append("ℹ️ **No sugar** - Pure lean dough, relies on flour sugars for browning")
+
+    # === FAT ANALYSIS ===
+    st.subheader("🧈 Fat")
+    fat_pct = ingredients_by_type['fat']
+    if fat_pct > 0:
+        st.metric("Fat Percentage", f"{fat_pct:.1f}%")
+        if fat_pct < 3:
+            insights.append(f"ℹ️ **Lean dough ({fat_pct:.1f}% fat)** - Crispy crust, chewy texture")
+        elif 3 <= fat_pct <= 10:
+            insights.append(f"✅ **Lightly enriched ({fat_pct:.1f}% fat)** - Softer crumb, tender texture")
+        elif 10 < fat_pct <= 20:
+            insights.append(f"ℹ️ **Enriched dough ({fat_pct:.1f}% fat)** - Very tender, like brioche or challah")
+        else:
+            insights.append(f"ℹ️ **Highly enriched ({fat_pct:.1f}% fat)** - Almost pastry-like richness")
+    else:
+        insights.append("ℹ️ **No fat** - Traditional lean bread (baguette, Italian bread)")
+
+    # === WHOLE GRAIN ANALYSIS ===
+    st.subheader("🌾 Flour Composition")
+    total_flour_pct = ingredients_by_type['whole_grain'] + ingredients_by_type['white_flour']
+    if ingredients_by_type['whole_grain'] > 0:
+        whole_grain_ratio = (ingredients_by_type['whole_grain'] / total_flour_pct) * 100
+        st.metric("Whole Grain Percentage", f"{whole_grain_ratio:.1f}% of total flour")
+
+        if whole_grain_ratio < 25:
+            insights.append(f"ℹ️ **Small amount of whole grain ({whole_grain_ratio:.0f}%)** - Adds flavor without much texture change")
+        elif 25 <= whole_grain_ratio < 50:
+            insights.append(f"✅ **Mixed flour ({whole_grain_ratio:.0f}% whole grain)** - Good balance of nutrition and texture")
+        elif 50 <= whole_grain_ratio < 75:
+            insights.append(f"ℹ️ **Mostly whole grain ({whole_grain_ratio:.0f}%)** - Dense, nutritious loaf")
+            tips.append("💡 Whole grain absorbs more water - consider increasing hydration by 5-10%")
+        else:
+            insights.append(f"ℹ️ **100% whole grain** - Very dense and nutritious")
+            tips.append("💡 May need 10-15% more water than white flour recipes")
+            tips.append("💡 Consider adding vital wheat gluten for better rise")
+
+    # === OVERALL ASSESSMENT ===
+    st.markdown("---")
+    st.subheader("📋 Overall Assessment")
+
+    # Determine bread type
+    bread_type = ""
+    if fat_pct > 15 or sugar_pct > 15:
+        bread_type = "Rich, enriched bread (brioche, challah style)"
+    elif hydration > 75:
+        bread_type = "High-hydration artisan bread (ciabatta, focaccia style)"
+    elif hydration < 58:
+        bread_type = "Low-hydration dense bread (bagel, pretzel style)"
+    elif ingredients_by_type['whole_grain'] > 50:
+        bread_type = "Whole grain bread"
+    else:
+        bread_type = "Standard bread (sandwich, dinner rolls)"
+
+    st.markdown(f"**Recipe Type:** {bread_type}")
+
+    # Display insights, warnings, and tips
+    if insights:
+        st.markdown("### ✅ Insights")
+        for insight in insights:
+            st.markdown(insight)
+
+    if warnings:
+        st.markdown("### ⚠️ Warnings")
+        for warning in warnings:
+            st.markdown(warning)
+
+    if tips:
+        st.markdown("### 💡 Tips")
+        for tip in tips:
+            st.markdown(tip)
+
+    if not insights and not warnings and not tips:
+        st.info("Add more ingredients to get detailed analysis")
 
 
 def scale_recipe_tab():
