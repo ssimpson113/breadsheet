@@ -30,11 +30,23 @@ class BakersCalculator:
         Returns:
             Recipe with percentages calculated
         """
-        if recipe.flour_weight <= 0:
+        # Auto-detect flour weight by summing all ingredients with "flour" in the name
+        total_flour = 0.0
+        for ingredient in recipe.ingredients.values():
+            if "flour" in ingredient.name.lower():
+                total_flour += ingredient.amount
+
+        # Use detected flour weight, or fall back to recipe.flour_weight
+        flour_basis = total_flour if total_flour > 0 else recipe.flour_weight
+
+        if flour_basis <= 0:
             raise ValueError("Flour weight must be greater than 0 for baker's percentages")
 
+        # Update the recipe's flour weight with the detected value
+        recipe.flour_weight = flour_basis
+
         for ingredient in recipe.ingredients.values():
-            ingredient.percentage = (ingredient.amount / recipe.flour_weight) * 100
+            ingredient.percentage = (ingredient.amount / flour_basis) * 100
 
         return recipe
 
