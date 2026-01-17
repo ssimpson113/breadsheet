@@ -29,10 +29,11 @@ def main():
     st.markdown("*Baker's percentages, scaling, and unit conversions made easy*")
 
     # Create tabs for different functions
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📝 Recipe Builder",
         "📊 Baker's Percentages",
         "⚖️ Scale Recipe",
+        "📋 Recipe Converter",
         "🔄 Unit Converter",
         "➕ Custom Conversions"
     ])
@@ -47,9 +48,12 @@ def main():
         scale_recipe_tab()
 
     with tab4:
-        unit_converter_tab()
+        recipe_converter_tab()
 
     with tab5:
+        unit_converter_tab()
+
+    with tab6:
         custom_conversions_tab()
 
 
@@ -306,6 +310,185 @@ def scale_recipe_tab():
                 st.session_state.current_recipe = scaled_recipe
                 st.success("Scaled recipe is now your current recipe!")
                 st.rerun()
+
+
+def recipe_converter_tab():
+    """Tab for converting entire recipe to volume or imperial measurements."""
+    st.header("Recipe Converter")
+    st.markdown("*Convert your entire recipe to cups, tablespoons, or ounces for people who don't use a scale*")
+
+    if not st.session_state.current_recipe.ingredients:
+        st.warning("Please add ingredients to your recipe first (Recipe Builder tab)")
+        return
+
+    st.subheader(f"📋 {st.session_state.current_recipe.name}")
+
+    # Choose conversion system
+    conversion_system = st.radio(
+        "Convert to:",
+        ["Volume (Cups & Spoons)", "Imperial Weight (Ounces)", "Metric (Grams - Original)"],
+        horizontal=True
+    )
+
+    st.markdown("---")
+
+    # Create converted recipe display
+    converted_data = []
+    cannot_convert = []
+
+    for ingredient in st.session_state.current_recipe.ingredients.values():
+        ingredient_name = ingredient.name
+        amount_grams = ingredient.amount
+
+        if conversion_system == "Metric (Grams - Original)":
+            # Just show original
+            converted_data.append({
+                "Ingredient": ingredient_name,
+                "Amount": f"{amount_grams:.1f}g"
+            })
+
+        elif conversion_system == "Imperial Weight (Ounces)":
+            # Convert to ounces
+            ounces = st.session_state.conversion_manager.convert_from_grams(
+                ingredient_name, amount_grams, "oz"
+            )
+            if ounces is not None:
+                # Also show pounds if >= 16 oz
+                if ounces >= 16:
+                    pounds = ounces / 16
+                    remaining_oz = ounces % 16
+                    if remaining_oz > 0.1:
+                        converted_data.append({
+                            "Ingredient": ingredient_name,
+                            "Amount": f"{pounds:.0f} lb {remaining_oz:.1f} oz ({ounces:.1f} oz)"
+                        })
+                    else:
+                        converted_data.append({
+                            "Ingredient": ingredient_name,
+                            "Amount": f"{pounds:.1f} lb ({ounces:.1f} oz)"
+                        })
+                else:
+                    converted_data.append({
+                        "Ingredient": ingredient_name,
+                        "Amount": f"{ounces:.1f} oz"
+                    })
+            else:
+                converted_data.append({
+                    "Ingredient": ingredient_name,
+                    "Amount": f"{amount_grams:.1f}g (no conversion)"
+                })
+                cannot_convert.append(ingredient_name)
+
+        elif conversion_system == "Volume (Cups & Spoons)":
+            # Try to convert to the best volume unit
+            cups = st.session_state.conversion_manager.convert_from_grams(
+                ingredient_name, amount_grams, "cup"
+            )
+
+            if cups is not None:
+                # Determine best display format
+                if cups >= 1:
+                    # Show cups
+                    whole_cups = int(cups)
+                    remaining = cups - whole_cups
+
+                    if remaining >= 0.75:
+                        result = f"{whole_cups + 1} cups"
+                    elif remaining >= 0.66:
+                        result = f"{whole_cups} ¾ cups" if whole_cups > 0 else "¾ cup"
+                    elif remaining >= 0.5:
+                        result = f"{whole_cups} ½ cups" if whole_cups > 0 else "½ cup"
+                    elif remaining >= 0.33:
+                        result = f"{whole_cups} ⅓ cups" if whole_cups > 0 else "⅓ cup"
+                    elif remaining >= 0.25:
+                        result = f"{whole_cups} ¼ cups" if whole_cups > 0 else "¼ cup"
+                    elif whole_cups > 0:
+                        result = f"{whole_cups} cup{'s' if whole_cups > 1 else ''}"
+                    else:
+                        # Less than 1/4 cup, show in tablespoons
+                        tbsp = st.session_state.conversion_manager.convert_from_grams(
+                            ingredient_name, amount_grams, "tablespoon"
+                        )
+                        if tbsp:
+                            result = f"{tbsp:.1f} tbsp"
+                        else:
+                            result = f"{cups:.2f} cups"
+
+                    converted_data.append({
+                        "Ingredient": ingredient_name,
+                        "Amount": result
+                    })
+                elif cups >= 0.25:
+                    # Between 1/4 and 1 cup
+                    if cups >= 0.75:
+                        result = "¾ cup"
+                    elif cups >= 0.66:
+                        result = "⅔ cup"
+                    elif cups >= 0.5:
+                        result = "½ cup"
+                    elif cups >= 0.33:
+                        result = "⅓ cup"
+                    else:
+                        result = "¼ cup"
+
+                    converted_data.append({
+                        "Ingredient": ingredient_name,
+                        "Amount": result
+                    })
+                else:
+                    # Less than 1/4 cup, try tablespoons
+                    tbsp = st.session_state.conversion_manager.convert_from_grams(
+                        ingredient_name, amount_grams, "tablespoon"
+                    )
+
+                    if tbsp is not None:
+                        if tbsp >= 1:
+                            converted_data.append({
+                                "Ingredient": ingredient_name,
+                                "Amount": f"{tbsp:.1f} tbsp"
+                            })
+                        else:
+                            # Try teaspoons
+                            tsp = st.session_state.conversion_manager.convert_from_grams(
+                                ingredient_name, amount_grams, "teaspoon"
+                            )
+                            if tsp:
+                                converted_data.append({
+                                    "Ingredient": ingredient_name,
+                                    "Amount": f"{tsp:.1f} tsp"
+                                })
+                            else:
+                                converted_data.append({
+                                    "Ingredient": ingredient_name,
+                                    "Amount": f"{tbsp:.2f} tbsp"
+                                })
+                    else:
+                        converted_data.append({
+                            "Ingredient": ingredient_name,
+                            "Amount": f"{amount_grams:.1f}g (no conversion)"
+                        })
+                        cannot_convert.append(ingredient_name)
+            else:
+                # No cup conversion available, show in grams
+                converted_data.append({
+                    "Ingredient": ingredient_name,
+                    "Amount": f"{amount_grams:.1f}g (no conversion)"
+                })
+                cannot_convert.append(ingredient_name)
+
+    # Display the converted recipe
+    st.table(converted_data)
+
+    # Show warnings for items that couldn't be converted
+    if cannot_convert:
+        st.warning(f"⚠️ Could not convert: {', '.join(cannot_convert)}. Add custom conversions in the Custom Conversions tab.")
+
+    # Add helpful notes
+    st.markdown("---")
+    st.markdown("**💡 Tips:**")
+    st.markdown("- Volume measurements are less accurate than weight - results may vary")
+    st.markdown("- For best results, use a kitchen scale and measure in grams")
+    st.markdown("- Common fractions are shown for easier measuring (¼, ⅓, ½, ¾)")
 
 
 def unit_converter_tab():
