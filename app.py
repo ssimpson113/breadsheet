@@ -175,8 +175,21 @@ def bakers_percentage_tab():
 
         st.table(data)
 
+        # Calculate hydration (liquids as % of flour)
+        liquid_ingredients = ["water", "milk", "cream", "buttermilk", "oil", "yogurt",
+                             "honey", "maple syrup", "molasses", "eggs"]
+        total_liquid = 0.0
+        for ingredient in recipe_with_percentages.ingredients.values():
+            # Check if ingredient name contains any liquid keywords
+            if any(liquid in ingredient.name.lower() for liquid in liquid_ingredients):
+                total_liquid += ingredient.amount
+
+        hydration = (total_liquid / recipe_with_percentages.flour_weight) * 100 if recipe_with_percentages.flour_weight > 0 else 0
+
+        st.markdown("---")
         st.markdown(f"**Total Weight:** {recipe_with_percentages.get_total_weight():.1f}g")
         st.markdown(f"**Total Percentage:** {sum(i.percentage for i in recipe_with_percentages.ingredients.values()):.1f}%")
+        st.markdown(f"**Hydration:** {hydration:.1f}% ({total_liquid:.1f}g liquid)")
 
     except Exception as e:
         st.error(f"Error calculating percentages: {e}")
